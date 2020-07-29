@@ -48,8 +48,8 @@ Direct questions to Jeff Wall <wallj@humgen.ucsf.edu>
 
 int main (int argc, char *argv[])
 {
-  int a, b, num, den, pairs, S, **repcount, R, s, r, gridsize;
-  double rho, ***logliks, lik1, lik2, lik3, lik4, testlik, w, x, y, z;
+  int a, b, num, den, S, **repcount, R, s, r, gridsize;
+  double rho, pairs, ***logliks, lik1, lik2, lik3, lik4, testlik, w, x, y, z;
   double *rgrid;
   FILE *simlikfile, *grid;
 
@@ -85,7 +85,7 @@ int main (int argc, char *argv[])
 
   simlikfile = fopen (argv[2], "r");
 
-  while (fscanf (simlikfile, "%d %lf %*f %*f %lf %lf\n", &pairs, &rho, &lik1,
+  while (fscanf (simlikfile, "%lf %lf %*f %*f %lf %lf\n", &pairs, &rho, &lik1,
 		 &lik2) != EOF) {
 
     S = (int) floor (sqrt (2.*pairs));
@@ -109,7 +109,7 @@ int main (int argc, char *argv[])
   }
   fclose (simlikfile);
 
-  while (scanf ("%d %lf %lf %lf %lf %lf\n", &pairs, &rho, &lik1, &lik2, &lik3,
+  while (scanf ("%lf %lf %lf %lf %lf %lf\n", &pairs, &rho, &lik1, &lik2, &lik3,
 		&lik4) != EOF) {
     S = (int) floor (sqrt (2.*pairs));
     for (R=0; R<RMAX; ++R)
