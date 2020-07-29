@@ -1,0 +1,3 @@
+cc -O -o seqhot seqhot.c
+cc -O -o mlehot mlehot.c lnlikehot.c getprobu.c getprobmat1.c -lm
+cc -O -o hotspotliks3 hotspotliks3.c -lm

@@ -1,0 +1,76 @@
+#Create initial simulation file, change base positions to integers, and use
+#a MAF cutoff of 0.05
+
+cp seed1 seedms
+./ms_varrho0 1 30 1100. hot_n30new_sims4.h 0. 0. 1 | ./filtscale2 30 1100000 | ./filtpositions 30 | ./filtfreq2 30 .05 > sim1.hud
+
+#For a sliding window of 20 Kb, we estimate both a background and a hotspot
+#recombination rate
+
+cat sim1.hud | ./filtslidwin2 30 40000 1040000 20000 1000 | ./seqhot 30 .45 .55 | ./mlehot 30eloutc grid6c.h | ./hotspotliks3 grid6c.h out_n30new_large2 .98 1.02 .95 1.05 | grep -v Error | grep -n 0 > temp1
+cat temp1 | awk '$7 <= .01' | ./filthotspotliks 1 49000 > out_.01
+cat out_.01 | awk '($3-$2)<=5000' > out_.01_5kb
+cat temp1 | awk '$7 <= .001' | ./filthotspotliks 1 49000 > out_.001
+
+#Process file for LDhat
+
+./MS2LDhat.pl sim1.hud sim1 15
+
+#Run LDhat (-lk file downloaded with software package)
+
+./interval -seq sim1.ldhat.sites -loc sim1.ldhat.locs -lk lk_n30_t0.001 -its 60000000 -bpen 5 -samp 40000
+./stat -input rates.txt -burn 500 -loc sim1.ldhat.locs
+
+#Script to get convergence summary of LDhat run
+
+./first_column.pl 500 rates.txt bounds.txt consum.sim1.txt
+
+#convert res file to map file for each interval
+
+awk 'NR>2 && OFS="\t" {if(v)print "chr1",v*1000,$1*1000,rate;v=$1;rate=$2}' res.txt >sim1_map.BED
+
+#get last line of bed file from locs file
+
+next_last_coord=$(tail -n2 sim1.ldhat.locs | head -1 | awk '{print $1*1000}')
+final_coord=$(tail -n1 sim1.ldhat.locs | awk '{print $1*1000}')
+final_rate=$(tail -n1 res.txt | awk '{print $2}')
+printf "chr1\t$next_last_coord\t$final_coord\t$final_rate\n" >> sim1_map.BED
+
+#make bins, output is 'sim1.BED.binned_by_1kb.txt'
+
+part1=$(head -1 sim1_map.BED | awk 'OFS="\t" {print $1,$2}')
+printf "$part1\t$final_coord\n" >sim1.BED
+
+./make_bins.pl sim1.BED 1000 1kb
+
+#get average rate in each 1kb bin and add to map file from above
+
+./rate_at_hotspots.pl sim1_map.BED sim1.BED.binned_by_1kb.txt sim1_averaged.txt 0 3 bp
+
+#Identify 1 Kb regions with LDhat estimate 10 times the background rate
+
+cat sim1_averaged.txt | awk '$4>=10.' | awk '{print $2-1" "$3}' | grep -v end > LDhatn30_10_1
+
+#Identify hotspots using protocol of Auton et al. (2012)
+
+cat out_.01_5kb | awk '$1==1' | awk '{print $2" "$3}' > temp1a
+./filtoverlap3b temp1a LDhatn30_10_1 | uniq | awk '{print "1 "$1" "$2}' | ./filtoverlap | awk '$1>0 && $1<101' > outauton12_20kb
+
+#Identify 1 Kb regions where LDhat estimate is a local maximum
+
+cat sim1_averaged.txt | grep -v peak | awk '{print $2" "$3" "$4}' | ./filtlocalmax | awk '{print $1" "$2}' > LDhat_lmax_1
+
+#Calculate hotspots using protocol of Auton et al. (2014)
+
+cat out_.001 | awk '$1==1' | awk '{print $2" "$3}' > temp1b
+./filtoverlap3b temp1b LDhat_lmax_1 | uniq | awk '{print "1 "$1" "$2}' | ./filtoverlap | awk '$1==1' | awk '{print $2" "$3}' > temp1c
+cat out_.01 | awk '$1==1' | awk '{print $2" "$3}' > Temp1
+./filtoverlap3c temp1c Temp1 | uniq | awk '{print "1 "$1" "$2}' | ./filtoverlap | awk '$1>0 && $1<101' > outauton14_20kb
+
+#Identify hotspots using protocol of Wall and Stevison (2016)
+
+cat out_.01 | awk '$1==1' | awk '{print $2" "$3}' > temp1d
+./filtoverlap3 temp1d LDhatn30_10_1 | uniq | awk '{print "1 "$1" "$2}' | ./filtoverlap > outwall16_20kb
+
+rm temp*
+rm Temp1
